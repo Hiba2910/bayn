@@ -1,0 +1,789 @@
+#include <stdio.h>
+#include <stdlib.h>
+//#include "structure.c"
+//#include "makotomatsomoto.c"
+//#include "fibonacci.c"
+#define N 624
+#define M 397
+#define MATRIX_A 0x9908b0dfUL   /* constant vector a */
+#define UPPER_MASK 0x80000000UL /* most significant w-r bits */
+#define LOWER_MASK 0x7fffffffUL /* least significant r bits */
+
+/* -------------------------------------------------------------------- */
+/* on cree la fonction fibonacci afin de faire le calcul de la suite de fibonacci */
+/* */
+/* En entrée: cette fonction prend un entier n en parametre */
+/* */
+/* En sortie: retourne un entier qui represente la somme des n premiers nombre a partir de 1 */
+/* -------------------------------------------------------------------- */
+static unsigned long mt[N]; /* the array for the state vector  */
+static int mti=N+1; /* mti==N+1 means mt[N] is not initialized */
+
+/* initializes mt[N] with a seed */
+void init_genrand(unsigned long s)
+{
+    mt[0]= s & 0xffffffffUL;
+    for (mti=1; mti<N; mti++) {
+        mt[mti] =
+	    (1812433253UL * (mt[mti-1] ^ (mt[mti-1] >> 30)) + mti);
+        /* See Knuth TAOCP Vol2. 3rd Ed. P.106 for multiplier. */
+        /* In the previous versions, MSBs of the seed affect   */
+        /* only MSBs of the array mt[].                        */
+        /* 2002/01/09 modified by Makoto Matsumoto             */
+        mt[mti] &= 0xffffffffUL;
+        /* for >32 bit machines */
+    }
+}
+
+/* initialize by an array with array-length */
+/* init_key is the array for initializing keys */
+/* key_length is its length */
+/* slight change for C++, 2004/2/26 */
+void init_by_array(unsigned long init_key[], int key_length)
+{
+    int i, j, k;
+    init_genrand(19650218UL);
+    i=1; j=0;
+    k = (N>key_length ? N : key_length);
+    for (; k; k--) {
+        mt[i] = (mt[i] ^ ((mt[i-1] ^ (mt[i-1] >> 30)) * 1664525UL))
+          + init_key[j] + j; /* non linear */
+        mt[i] &= 0xffffffffUL; /* for WORDSIZE > 32 machines */
+        i++; j++;
+        if (i>=N) { mt[0] = mt[N-1]; i=1; }
+        if (j>=key_length) j=0;
+    }
+    for (k=N-1; k; k--) {
+        mt[i] = (mt[i] ^ ((mt[i-1] ^ (mt[i-1] >> 30)) * 1566083941UL))
+          - i; /* non linear */
+        mt[i] &= 0xffffffffUL; /* for WORDSIZE > 32 machines */
+        i++;
+        if (i>=N) { mt[0] = mt[N-1]; i=1; }
+    }
+
+    mt[0] = 0x80000000UL; /* MSB is 1; assuring non-zero initial array */
+}
+
+/* generates a random number on [0,0xffffffff]-interval */
+unsigned long genrand_int32(void)
+{
+    unsigned long y;
+    static unsigned long mag01[2]={0x0UL, MATRIX_A};
+    /* mag01[x] = x * MATRIX_A  for x=0,1 */
+
+    if (mti >= N) { /* generate N words at one time */
+        int kk;
+
+        if (mti == N+1)   /* if init_genrand() has not been called, */
+            init_genrand(5489UL); /* a default initial seed is used */
+
+        for (kk=0;kk<N-M;kk++) {
+            y = (mt[kk]&UPPER_MASK)|(mt[kk+1]&LOWER_MASK);
+            mt[kk] = mt[kk+M] ^ (y >> 1) ^ mag01[y & 0x1UL];
+        }
+        for (;kk<N-1;kk++) {
+            y = (mt[kk]&UPPER_MASK)|(mt[kk+1]&LOWER_MASK);
+            mt[kk] = mt[kk+(M-N)] ^ (y >> 1) ^ mag01[y & 0x1UL];
+        }
+        y = (mt[N-1]&UPPER_MASK)|(mt[0]&LOWER_MASK);
+        mt[N-1] = mt[M-1] ^ (y >> 1) ^ mag01[y & 0x1UL];
+
+        mti = 0;
+    }
+
+    y = mt[mti++];
+
+    /* Tempering */
+    y ^= (y >> 11);
+    y ^= (y << 7) & 0x9d2c5680UL;
+    y ^= (y << 15) & 0xefc60000UL;
+    y ^= (y >> 18);
+
+    return y;
+}
+
+/* generates a random number on [0,0x7fffffff]-interval */
+long genrand_int31(void)
+{
+    return (long)(genrand_int32()>>1);
+}
+
+/* generates a random number on [0,1]-real-interval */
+double genrand_real1(void)
+{
+    return genrand_int32()*(1.0/4294967295.0);
+    /* divided by 2^32-1 */
+}
+
+/* generates a random number on [0,1)-real-interval */
+double genrand_real2(void)
+{
+    return genrand_int32()*(1.0/4294967296.0);
+    /* divided by 2^32 */
+}
+
+/* generates a random number on (0,1)-real-interval */
+double genrand_real3(void)
+{
+    return (((double)genrand_int32()) + 0.5)*(1.0/4294967296.0);
+    /* divided by 2^32 */
+}
+
+/* generates a random number on [0,1) with 53-bit resolution*/
+double genrand_res53(void)
+{
+    unsigned long a=genrand_int32()>>5, b=genrand_int32()>>6;
+    return(a*67108864.0+b)*(1.0/9007199254740992.0);
+}
+/* These real versions are due to Isaku Wada, 2002/01/09 added */
+int fibonacci(int n)
+{
+    if (n<=1)
+        return n;
+    else
+        return (fibonacci(n-1)+fibonacci(n-2));
+}
+/* -------------------------------------------------------------------- */
+/* on cree la fonction init afin d'initialiser les champ des nouveaux lapin */
+/* */
+/* En entrée: cette fonction ne prend rien en entrée*/
+/* */
+/* En sortie: retourne le lapin initialisé. */
+/* -------------------------------------------------------------------- */
+enum sexe
+{
+    MALE,
+    FEMELLE,
+    NONE
+};
+enum booleen
+{
+    TRUE,
+    FALSE,
+    NONEE
+};
+/* -------------------------------------------------------------------- */
+/* on cree la structure lapin ou on va representer les lapins avec une structure */
+/* */
+/* on represente leur age , leur age de maturite, leur nombres de portees (nbPortees),
+  on etudie egalement leur accouchement(accoucher), un boolean pour determiner si ils sont
+   fertile ou pas (fertilite),s'ils sont en vie (en vie)
+   et leur sexe */
+/* -------------------------------------------------------------------- */
+
+typedef struct
+{
+    int           age;
+    int           nbPortées;
+    int           accoucher;
+    int           agedematurité;
+    enum sexe     sexe;
+    enum booleen  fertilité;
+    enum booleen  envie;
+
+
+}Lapin;
+/* -------------------------------------------------------------------- */
+/* on cree la structure listL afin de stocker les lapins */
+/* */
+/* cette structure represente un element de la liste qui est compose 
+ d'un champ lapin et d'un pointeur qui pointe sur le prochain element de la liste */
+/* -------------------------------------------------------------------- */
+
+/*typedef struct
+{
+    Lapin        lapin;
+    struct    listL *  suiv;
+}listL;*/
+/* -------------------------------------------------------------------- */
+/* la structure liste contient deux champs  : un pointeur sur la tete de la liste              *
+* de type listL et un entier qui contient le nombre de lapins */
+/* -------------------------------------------------------------------- */
+ typedef struct listL
+{
+    Lapin lapin;
+    struct listL *suiv;
+} listL;
+
+typedef struct liste
+{
+    listL *  tete;
+    int nbLapins;
+}liste;
+/* -------------------------------------------------------------------- */
+/*on cree la fonction age_maturite pour determiner l'age de maturite des lapins */
+/* */
+/* En entrée: cette fonction ne prend rien en parametre */
+/* */
+/* En sortie: cette fonction retourne un entier qui represente l'age de maturite des lapins */
+/* -------------------------------------------------------------------- */
+   
+int age_maturité ()
+{
+    double nbAleatoire=genrand_real1();
+
+    if( nbAleatoire < 0.25)
+    {
+        return 5;
+    }
+    else
+    {
+        if( nbAleatoire < 0.5)
+        {
+            return 6;
+        }
+        else
+        {
+            if(nbAleatoire < 0.75)
+            {
+                return 7;
+            }
+            else
+            {
+                if(nbAleatoire<=1)
+                {
+                    return 8;
+                }
+
+            }
+
+        }
+
+    }
+}
+Lapin init()
+{
+    Lapin lapin;
+    lapin.envie=TRUE;
+    lapin.sexe=NONE;
+    lapin.age=0;
+    lapin.fertilité=NONEE;
+    lapin.agedematurité=age_maturité();
+    lapin.nbPortées=0;
+    lapin.accoucher=0;
+
+    return lapin;
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction listeinit afin d'initialiser la structure de la liste */
+/* */
+/* En entrée: cette fonction prend en entrée un poiteur sur une liste */
+/* */
+/* En sortie: cette fonction retourne la liste initialisée */
+/* -------------------------------------------------------------------- */
+
+liste* listeinit(liste* liste1)
+{
+    liste1 = malloc(sizeof(*liste1));
+    liste1->tete=NULL;
+    liste1->nbLapins=0;
+    return liste1;
+
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction LapinsEnVie afin de calculer le nombre de lapins qui sont en vie  */
+/* */
+/* En entrée: cette fonction prend un pointeur sur une liste */
+/* */
+/* En sortie: cette fonction retourne la valeur du compteur donc le nombre de lapin en vie. */
+/* -------------------------------------------------------------------- */
+
+int LapinsEnVie(listL * liste1)
+{
+   int   compteur=0;
+
+   while(liste1 != NULL)
+   {
+       if(liste1->lapin.envie==TRUE)
+       {
+           compteur++;
+       }
+
+       liste1=liste1->suiv;
+   }
+
+   return compteur;
+
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction LapinsMort afin de calculer le nombre de lapins qui sont morts  */
+/* */
+/* En entrée: cette fonction prend un pointeur sur une liste */
+/* */
+/* En sortie: cette fonction retourne la valeur du compteur donc le nombre de lapin morts. */
+/* -------------------------------------------------------------------- */
+
+int LapinsMort(listL * liste1)
+{
+   int   compteur=0;
+
+   while(liste1 != NULL)
+   {
+       if(liste1->lapin.envie==FALSE)
+       {
+           compteur++;
+       }
+
+       liste1=liste1->suiv;
+   }
+
+   return compteur;
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction sexeL afin de determiner le sexe des lapins */
+/* */
+/* En entrée: cette fonction ne prend rien en entrée */
+/* */
+/* En sortie: cette fonction retourne une enumeration qui retourne femelle
+   si le nombre aleatoire generé est inferieur a 0,5 et male sinon. */
+/* -------------------------------------------------------------------- */
+
+enum sexe sexeLapins()
+{
+    double nbAleatoire=genrand_real1();
+
+    if(nbAleatoire<0.5)
+    {
+       return FEMELLE;
+    }
+    else
+    {
+       return MALE;
+    }
+
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction Creation afin de creer de nouveaux lapins */
+/* */
+/* En entrée: cette fonction prend un pointeur sur une liste  */
+/* */
+/* En sortie: cette fonction retourne une liste avec le nouveau lapin ajouté */
+/* -------------------------------------------------------------------- */
+
+liste* Creation(liste* liste1)
+{
+   listL* NvLapin = (listL*)malloc(sizeof( listL));
+   NvLapin->lapin=init();
+   NvLapin->suiv=liste1->tete;
+   liste1->tete=NvLapin;
+   liste1->nbLapins++;
+
+   return liste1;
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction LapinMales afin de calculer le nombre des lapins males */
+/* */
+/* En entrée: cette fonction prend un pointeur sur une liste  */
+/* */
+/* En sortie: cette fonction retourne la valeur du compteur donc le nombre des lapins males */
+/* -------------------------------------------------------------------- */
+
+int LapinMales(listL * liste1)
+{
+   int   compteur=0;
+   while(liste1 != NULL)
+   {
+       if((liste1->lapin.sexe==MALE) && (liste1->lapin.age>=liste1->lapin.agedematurité) && (liste1->lapin.envie==TRUE))
+       {
+           compteur++;
+       }
+       liste1=liste1->suiv;
+   }
+   return compteur;
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction LapinFemelles afin de calculer le nombre des lapins femelles */
+/* */
+/* En entrée: cette fonction prend un pointeur sur une liste  */
+/* */
+/* En sortie: cette fonction retourne la valeur du compteur donc le nombre des lapins femelles */
+/* -------------------------------------------------------------------- */
+int LapinFemelles(listL * liste1)
+{
+   int   compteur=0;
+   while(liste1 != NULL)
+   {
+       if((liste1->lapin.sexe==FEMELLE) && (liste1->lapin.age>=liste1->lapin.agedematurité) && (liste1->lapin.envie==TRUE))
+       {
+           compteur++;
+       }
+
+       liste1=liste1->suiv;
+
+   }
+
+   return compteur;
+   /* -------------------------------------------------------------------- */
+/*on cree la fonction LapinsBebes afin de calculer le nombre des lapins bebes */
+/* */
+/* En entrée: cette fonction prend un pointeur sur une liste  */
+/* */
+/* En sortie: cette fonction retourne la valeur du compteur donc le nombre des lapins bebes */
+/* -------------------------------------------------------------------- */
+
+int LapinBebes(listL * liste1);
+{
+   int   compteur=0;
+   while(liste1 != NULL)
+   {
+       if((liste1->lapin.age<liste1->lapin.agedematurité) && (liste1->lapin.envie==TRUE))
+       {
+           compteur++;
+       }
+
+       liste1=liste1->suiv;
+
+   }
+
+   return compteur;
+}
+  /* -------------------------------------------------------------------- */
+/*on cree la fonction AfficheListeL pour afficher les informations stocké dans la liste des lapins */
+/* */
+/* En entrée: cette fonction prend en parametre un pointeur sur la liste et un entier mois   */
+/* */
+/* En sortie: cette fonction fait des print pour les informations qui sont stocké dans la liste des lapins */
+/* -------------------------------------------------------------------- */
+
+void AfficheListeL(liste * liste1,int mois)
+{
+    printf("mois= %d \n",mois);
+    printf("le nombre de lapins en vie est=%d ,",LapinsEnVie(liste1->tete));
+    printf("le nombre de lapins morts est =%d ,",LapinsMort(liste1->tete));
+    printf("le nombre de lapins males est=%d ,",LapinMales(liste1->tete));
+    printf("le nombre delapins femelles est=%d, ",LapinFemelles(liste1->tete));
+    printf("le nombre de lapins bebes est =%d.\n",LapinBebes(liste1->tete));
+
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction ActuAgeLapin pour actualiser l'age des lapins */
+/* */
+/* En entrée: cette fonction prend en parametre un pointeur sur un element de la liste des lapins   */
+/* */
+/* En sortie: cette fonction ne retourne rien elle incremente juste l'age des lapins */
+/* -------------------------------------------------------------------- */
+
+void actuAgeLapin(listL * e )
+{
+    e->lapin.age++;
+
+}
+/* -------------------------------------------------------------------- */
+//on cree la fonction LapinFertilité afin de determiner si un lapin est fertile ou pas//
+/* */
+/* En entrée: cette fonction prend en parametre un pointeur sur la liste des lapins   */
+/* */
+/* En sortie: cette fonction ne retourne rien elle actualise la fertilité d'un lapin si
+*  le nombre aleatoire generé inferieure a 0,2 on l'actualise a false sinon on l'actualise a true */
+/* -------------------------------------------------------------------- */
+
+void Lapinfertilite(listL * liste1)
+{
+     double nbAleatoire=genrand_real1();
+
+     if(liste1->lapin.sexe==FEMELLE)
+     {
+        if(nbAleatoire<0.2)
+        {
+            liste1->lapin.fertilité=FALSE;
+        }
+        else
+        {
+            liste1->lapin.fertilité=TRUE;
+        }
+     }
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction bebeportée afin de determiner le nombre de bebes qui vont naitre dans une portée */
+/* */
+/* En entrée: cette fonction ne prend rien en parametre  */
+/* */
+/* En sortie: cette fonction retourne un entier qui represente le nombre de bebes qui vont naitre dans une portée */
+/* -------------------------------------------------------------------- */
+
+int bebeportée()
+{
+    double nbAleatoire=genrand_real1();
+    if(nbAleatoire<0.25)
+    {
+        return 3;
+    }
+    else
+    {
+        if(nbAleatoire<0.50)
+        {
+            return 4;
+        }
+        else
+        {
+            if (nbAleatoire<0.75)
+            {
+                return 5;
+            }
+           
+                else
+                {
+                    return 6;
+                }
+
+            }
+
+         }
+
+     }
+
+
+}
+
+
+
+
+/* -------------------------------------------------------------------- */
+/*on cree la fonction bebenaissance pour faire naitre tous les bebes d'une portée */
+/* */
+/* En entrée: cette fonction prend en parametre un pointeur sur la liste des lapins  */
+/* */
+/* En sortie: cette fonction retourne la liste des lapins actualisée avec les nouveaux bebes lapins */
+/* -------------------------------------------------------------------- */
+
+
+liste* bebenaissance (liste * liste1)
+{
+    int bebeportée();
+    int i;
+    int nbbebes;
+    nbbebes=bebeportée();
+    for(i=0;i<nbbebes;i++)
+    {
+        liste1=Creation(liste1);
+    }
+
+    return liste1;
+}
+
+/* -------------------------------------------------------------------- */
+/*on cree la fonction nbPortees afin de determiner le nombre de portee qu'une lapine aura dans l'annee */
+/* */
+/* En entrée: cette fonction prend en parametre une structure de lapin  */
+/* */
+/* En sortie: cette fonction retourne une structure lapin avec le champ nbPortées initialise a la nouvelle valeur  */
+/* -------------------------------------------------------------------- */
+
+
+Lapin  nbportees(Lapin lapin)
+{
+    double nbAleatoire=genrand_real1();
+
+    if(lapin.sexe==FEMELLE)
+    {
+        if(nbAleatoire<0.14)
+         {
+         lapin.nbPortées=4;
+         }
+         else
+         {
+             if(nbAleatoire<0.38)
+              {
+                  lapin.nbPortées=5;
+              }
+             else
+              {
+                  if( nbAleatoire<0.62) 
+                  {
+                      lapin.nbPortées=6;
+                  }
+                else
+                 {
+                     
+                    if(nbAleatoire<0.86) 
+                  {
+                      lapin.nbPortées=7;
+                  }
+
+                
+                 else
+                 {
+                    if( nbAleatoire<1)
+                    {
+                        lapin.nbPortées=8;
+                    }
+                 }
+
+              }
+              }
+
+          }
+     }
+     return lapin;
+
+
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction Male afin de tester si on a au moins un male au sein de la population*/
+/* */
+/* En entrée: cette fonction prend en parametre un pointeur sur la liste des lapins  */
+/* */
+/* En sortie: cette fonction retourne TRUE si on au moins un male dans la generation et renvoie FALSE  sinon */
+/* -------------------------------------------------------------------- */
+
+enum booleen Male(liste *liste1)
+{
+    while(liste1->tete!=NULL)
+    {
+        if(liste1->tete->lapin.sexe==MALE)
+        {
+            return TRUE;
+        }
+        liste1->tete=liste1->tete->suiv;
+    }
+    return FALSE;
+
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction Acoucher afin d'assurer l'accouchement d'une lapine*/
+/* */
+/* En entrée: cette fonction prend en parametre un pointeur sur la liste des lapin list, 
+   et un pointeur vers l'element de liste de lapin concernee par l'accouchemnt  */
+/* */
+/* En sortie: cette fonction retourne la liste des lapis actualisee */
+/* -------------------------------------------------------------------- */
+
+liste * Accoucher(liste * liste1 , listL * e )
+{
+    if((e->lapin.sexe==FEMELLE) && (e->lapin.age >= e->lapin.agedematurité) && (e->lapin.envie==TRUE) && (Male(liste1)==TRUE) )
+    {
+        if(e->lapin.nbPortées>0)
+        {
+            e->lapin.nbPortées--;
+            liste1=bebenaissance(liste1);
+            e->lapin.accoucher++;
+        }
+
+    }
+
+    return liste1;
+
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction lapinmort pour marquer la mort d'un lapin */
+/* */
+/* En entrée: cette fonction prend en parametre un pointeur sur un element de la liste des lapins  */
+/* */
+/* En sortie: cette fonction ne retourne rien  */
+/* -------------------------------------------------------------------- */
+
+void lapinmort(listL* e)
+{
+    e->lapin.envie=FALSE;
+}
+/* -------------------------------------------------------------------- */
+/*on cree la fonction survival pour calculer le taux de survie des lapins en fonction de leur age et 
+  les accouchement comme parametre que j'ai propose pour la survie */
+/* */
+/* En entrée: cette fonction prend en parametre un pointeur sur l'element Liste de la liste des lapins  */
+/* */
+/* En sortie: cette fonction ne retourne rien  */
+/* -------------------------------------------------------------------- */
+
+
+void survival( listL * e )
+{
+    double nbAleatoire=genrand_real1();
+
+    if (e->lapin.envie==TRUE)
+    {
+        if(e->lapin.age>=e->lapin.agedematurité)
+        {
+            if(e->lapin.age<120)
+            {
+                if(nbAleatoire>0.60)
+                {
+                    lapinmort(e);
+                }
+                else
+                {
+                    for(int i=1;i<5;i++)
+                    {
+                        if(e->lapin.age<120+i*12)
+                        {
+                            if(nbAleatoire>0.60+0.10*i)
+                             {
+                                 lapinmort(e);
+                             }
+                        }
+                    }
+                }
+
+            }
+        }
+
+        else
+        {
+            if(nbAleatoire>0.35)
+            {
+                lapinmort(e);
+            }
+
+        }
+        if ((e->lapin.accoucher==TRUE) && (nbAleatoire< e->lapin.accoucher * 0.15))
+        {
+            lapinmort(e);
+        }
+
+   }
+}
+
+
+
+int main()
+{
+    unsigned long init[4]={0x123, 0x234, 0x345, 0x456}, length=4;
+    init_by_array(init, length);
+    
+    // question 1
+    printf("%d",fibonacci(84));
+    
+    // question 2
+    int init_lapin, popu, mois;
+    liste * liste1 = NULL;
+    liste1 = listeinit(liste1);
+    
+    printf("veuillez entrez le nombre de lapins avec lequel vous souhaitez lancer l'estimation de l'etude de la population : \n");
+    scanf("%d",&popu);
+    
+    for(init_lapin=0;init_lapin<popu;init_lapin++)
+    {
+        liste1 = Creation(liste1);
+    }
+    
+    for(mois=0;mois<120;mois++)
+    {
+        listL * e= liste1->tete;
+        int n =liste1->nbLapins;
+        
+        for(int i=0;i<n;i++)
+        {
+            if(mois%12==0)
+            {
+                lapinfertilite(e);
+                e->lapin = nbportees(e->lapin);
+                e->lapin.accoucher = 0;
+            }
+            
+            liste1 = Accoucher(liste1,e);
+            
+            actuAgeLapin(e);
+            
+            if(mois%12==11)
+            {
+                survival(e);
+            }
+            
+            e=e->suiv;
+        }
+        
+        AfficheListeL(liste1,mois);
+    }
+    
+    return 0;
+}
